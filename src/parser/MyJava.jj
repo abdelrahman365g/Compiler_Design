@@ -1,0 +1,75 @@
+PARSER_BEGIN(MyJavaParser)
+public class MyJavaParser {
+    public static void main(String[] args) throws Exception {
+        MyJavaParser parser = new MyJavaParser(System.in);
+        parser.Program();
+        System.out.println("Syntax validation successful.");
+    }
+}
+PARSER_END(MyJavaParser)
+
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+  | < "//" (~["\n","\r"])* ("\n" | "\r" | "\r\n") >
+  | <"/*" (~[])* "*/">
+}
+
+TOKEN : {
+    < CLASS: "class" >
+  | < INT: "int" >
+  | < IDENTIFIER: (["a"-"z","A"-"Z","_"])
+                    (["a"-"z","A"-"Z","0"-"9","_"])* >
+  | < LBRACE: "{" >
+  | < RBRACE: "}" >
+  | < SEMI: ";" >
+  |  < IF: "if" >
+  | < ELSE: "else" >
+  | < WHILE: "while" >
+  | < RETURN: "return" >
+  | < NUMBER: (["0"-"9"])+ ("." (["0"-"9"])+)? >
+  | < ASSIGN: "=" >
+  | < PLUS: "+" >
+  | < MINUS: "-" >
+  | < MUL: "*" >
+  | < DIV: "/" >
+  | < LPAREN: "(" >
+  | < RPAREN: ")" >
+
+
+}
+
+void Program() :
+{}
+{
+    ClassDeclaration() <EOF>
+}
+
+void ClassDeclaration() :
+{}
+{
+    <CLASS> <IDENTIFIER> <LBRACE>
+        ( Statement() )*
+    <RBRACE>
+}
+void Statement() :
+{}
+{
+      VarDeclaration()
+    | Assignment()
+}
+void VarDeclaration() :
+{}
+{
+    <INT> <IDENTIFIER> ( <ASSIGN> Expression() )? <SEMI>
+}
+void Expression() :
+{}
+{
+    <NUMBER>
+}
+
+void Assignment() :
+{}
+{
+    <IDENTIFIER> <ASSIGN> <NUMBER> <SEMI>
+}
