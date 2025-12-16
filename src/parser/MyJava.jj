@@ -1,0 +1,177 @@
+PARSER_BEGIN(MyJavaParser)
+public class MyJavaParser {
+    public static void main(String args[]) throws ParseException, java.io.IOException {
+    java.io.InputStream input = (args.length > 0) ? new java.io.FileInputStream(args[0]) : System.in;
+    MyJavaParser parser = new MyJavaParser(input);
+    parser.Program();
+    System.out.println("Syntax validation successful.");
+    }
+}
+PARSER_END(MyJavaParser)
+
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+  | < "//" (~["\n","\r"])* ("\n" | "\r" | "\r\n") >
+  | <"/*" (~[])* "*/">
+}
+
+TOKEN : {
+    < CLASS: "class" >
+  | < INT: "int" >
+  | <BOOL: "bool">
+  | <STRING: "string">
+  | <FUNC : "function">
+  | < LBRACE: "{" >
+  | < RBRACE: "}" >
+  | < SEMI: ";" >
+  |  < IF: "if" >
+  | < ELSE: "else" >
+  | < WHILE: "while" >
+  | < FOR: "for" >
+  | < RETURN: "return" >
+  | <TRUE: "true">
+  | <FALSE: "false">
+  | < NUMBER: (["0"-"9"])+ ("." (["0"-"9"])+)? >
+  | < STRING_LITERAL: "\"" (~["\"","\\"] | "\\" (~[]))* "\"" >
+  | < ASSIGN: "=" >
+  | < PLUS: "+" >
+  | < MINUS: "-" >
+  | < MUL: "*" >
+  | < DIV: "/" >
+  | < LPAREN: "(" >
+  | < RPAREN: ")" >
+  | < ST: "<" >
+  | < SE: "<=" >
+  | < GT: ">" >
+  | < GE: ">=" >
+  | < EQ: "==" >
+  | < NE: "!=" >
+  | < IDENTIFIER: (["a"-"z","A"-"Z","_"])
+                  (["a"-"z","A"-"Z","0"-"9","_"])* >
+
+
+}
+
+void Program() :
+{}
+{
+    (ClassDeclaration())* <EOF>
+}
+
+void ClassDeclaration() :
+{}
+{
+    <CLASS> <IDENTIFIER> <LBRACE>
+        ( Function() )*
+    <RBRACE>
+}
+void Function():
+{}
+{
+    <FUNC><IDENTIFIER> <LPAREN> (((<INT> <IDENTIFIER>) | (<STRING> <IDENTIFIER>) | (<BOOL> <IDENTIFIER>))?) <RPAREN><LBRACE>
+        ( Statement() )*
+    <RBRACE>
+}
+void Statement() :
+{}
+{
+    VarDeclaration()
+  | Assignment()
+  | IfStatement()
+  | WhileStatement()
+  | ReturnStatement()
+  | ForStatement()
+}
+void VarDeclaration() :
+{}
+{
+    VarInt() | VarBool() | VarString()
+}
+void BooleanExpression() :
+{}
+{
+    RelationalExpression() ( ( <EQ> | <NE> ) RelationalExpression() )*
+}
+
+void RelationalExpression() :
+{}
+{
+    AdditiveExpression() ( ( <ST> | <GT> | <SE> | <GE> ) AdditiveExpression() )*
+}
+
+void AdditiveExpression() :
+{}
+{
+    Term() ( ( <PLUS> | <MINUS> ) Term() )*
+}
+void Term() :
+{}
+{
+    Factor() ( ( <MUL> | <DIV> ) Factor() )*
+}
+void Factor() :
+{}
+{
+    <NUMBER> | <IDENTIFIER> | <STRING_LITERAL> | <LPAREN> BooleanExpression() <RPAREN>
+}
+
+void Assignment() :
+{}
+{
+    <IDENTIFIER> <ASSIGN> AdditiveExpression() <SEMI>
+}
+void IfStatement() :
+{}
+{
+    <IF> <LPAREN> BooleanExpression() <RPAREN> <LBRACE>
+        ( Statement() )*
+    <RBRACE> (  ElseStatement() )?
+}
+void ElseStatement():
+{}
+{
+    <ELSE> <LBRACE> ( Statement() )*  <RBRACE>
+}
+
+void WhileStatement() :
+{}
+{
+    <WHILE> <LPAREN> BooleanExpression() <RPAREN>  <LBRACE> ( Statement() )*  <RBRACE>
+}
+
+void ForStatement() :
+{}
+{
+    <FOR> <LPAREN>
+    ( VarInt()| <SEMI> )
+    ( BooleanExpression() )? <SEMI>
+    ( UpdateExpression() )? <RPAREN>
+    <LBRACE>
+        ( Statement() )*
+    <RBRACE>
+}
+void ReturnStatement() :
+{}
+{
+    <RETURN> AdditiveExpression() <SEMI>
+}
+void VarInt() :
+{}
+{
+    <INT> <IDENTIFIER> ( <ASSIGN> AdditiveExpression() )? <SEMI>
+}
+void VarString():
+{}
+{
+    <STRING> <IDENTIFIER> ( <ASSIGN> <STRING_LITERAL> )? <SEMI>
+}
+void VarBool():
+{}
+{
+    <BOOL> <IDENTIFIER> ( <ASSIGN> (<TRUE> | <FALSE> | BooleanExpression() ) )? <SEMI>
+}
+void UpdateExpression() :
+{}
+{
+    <IDENTIFIER> <ASSIGN> AdditiveExpression()
+}
