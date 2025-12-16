@@ -1,0 +1,220 @@
+options {
+    STATIC = false;
+    LOOKAHEAD = 1;
+    CHOICE_AMBIGUITY_CHECK = 2;
+    OTHER_AMBIGUITY_CHECK = 1;
+    DEBUG_PARSER = false;
+    DEBUG_TOKEN_MANAGER = false;
+    DEBUG_LOOKAHEAD = false;
+    FORCE_LA_CHECK = true;
+    BUILD_PARSER = true;
+    BUILD_TOKEN_MANAGER = true;
+    UNICODE_INPUT = false;
+    JAVA_UNICODE_ESCAPE = false;
+    IGNORE_CASE = false;
+    USER_TOKEN_MANAGER = false;
+    USER_CHAR_STREAM = false;
+    JJTREE_OUTPUT_DIRECTORY = "ast";
+    NODE_DEFAULT_VOID = true;
+    MULTI = true;
+    NODE_PREFIX = "AST";
+}
+PARSER_BEGIN(MyJavaParser)
+package ast;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+public class MyJavaParser {
+    private static SymbolTable globalScope = new SymbolTable();
+    private static SymbolTable currentScope = globalScope;
+    public static void main(String args[]) throws ParseException, java.io.IOException {
+        InputStream input = (args.length > 0) ? new java.io.FileInputStream(args[0]) : System.in;
+        MyJavaParser parser = new MyJavaParser(input);
+        try {
+            ASTProgram root = parser.Program();
+            System.out.println("Syntax validation successful.");
+            System.out.println("\n--- Symbol Table ---");
+            globalScope.printTable();
+            System.out.println("\n--- Abstract Syntax Tree (AST) ---");
+            root.dump("");
+        } catch (ParseException e) {
+            System.err.println("Syntax Error: " + e.getMessage());
+        }
+    }
+}
+PARSER_END(MyJavaParser)
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+  | < "//" (~["\n","\r"])* ("\n" | "\r" | "\r\n") >
+  | < "/*" (~["*"])* "*" (~["/"] (~["*"])* "*")* "/" >
+}
+TOKEN : {
+    < CLASS: "class" >
+  | < INT: "int" >
+  | < BOOL: "bool" >
+  | < STRING: "string" >
+  | < FUNC : "function" >
+  | < LBRACE: "{" >
+  | < RBRACE: "}" >
+  | < SEMI: ";" >
+  | < COMMA: "," >
+  | < IF: "if" >
+  | < ELSE: "else" >
+  | < WHILE: "while" >
+  | < FOR: "for" >
+  | < RETURN: "return" >
+  | < TRUE: "true" >
+  | < FALSE: "false" >
+  | < ASSIGN: "=" >
+  | < PLUS: "+" >
+  | < MINUS: "-" >
+  | < MUL: "*" >
+  | < DIV: "/" >
+  | < EQ: "==" >
+  | < NE: "!=" >
+  | < ST: "<" >
+  | < GT: ">" >
+  | < SE: "<=" >
+  | < GE: ">=" >
+  | < AND: "&&" >
+  | < OR: "||" >
+  | < NOT: "!" >
+  | < LPAREN: "(" >
+  | < RPAREN: ")" >
+  | < PLUS_PLUS: "++" >
+  | < MINUS_MINUS: "--" >
+  | < NUMBER: (["0"-"9"])+ ("." (["0"-"9"])+)? >
+  | < STRING_LITERAL: "\"" (~["\"","\\"] | "\\" (~[]))* "\"" >
+  | < IDENTIFIER: ["a"-"z","A"-"Z"] (["a"-"z","A"-"Z","0"-"9","_"])* >
+}
+ASTProgram Program() #Program: {} {
+    ( ClassDeclaration() )*
+    <EOF>
+    { return (ASTProgram) jjtThis; }
+}
+void ClassDeclaration() #ClassDeclaration: { Token t = null; } {
+    <CLASS> t = <IDENTIFIER>
+    { globalScope.enterScope("Class: " + t.image); }
+    <LBRACE> ( FunctionDeclaration() )* <RBRACE>
+    { globalScope.exitScope(); }
+}
+void FunctionDeclaration() #FunctionDeclaration: { Token t = null; } {
+    <FUNC> Type() t = <IDENTIFIER>
+    { globalScope.enterScope("Func: " + t.image); }
+    <LPAREN> Parameters() <RPAREN>
+    <LBRACE> FunctionBody() <RBRACE>
+    { globalScope.exitScope(); }
+}
+void Parameters() #Parameters: {} {
+    ( Type() <IDENTIFIER> ( <COMMA> Type() <IDENTIFIER> )* )?
+}
+void FunctionBody() #FunctionBody: {} {
+    ( Statement() )*
+}
+void Type() #Type: { Token t = null; } {
+    ( t = <INT> | t = <BOOL> | t = <STRING> )
+    { jjtThis.setName(t.image); }
+}
+void Statement() : {} {
+    ( LOOKAHEAD(2) VarDeclaration() | Assignment() | IfStatement() | WhileStatement() | ForStatement() | ReturnStatement() )
+}
+void VarDeclaration() #VarDeclaration: {
+    Token t = null;
+    String typeName = "";
+} {
+    Type() {
+        ASTType typeNode = (ASTType) jjtree.peekNode();
+        typeName = typeNode.getName();
+    }
+    t = <IDENTIFIER>
+    {
+        globalScope.insert(t.image, typeName);
+    }
+    ( <ASSIGN> AssignmentExpression() #VarAssignment(2) )?
+    <SEMI>
+}
+void ReturnStatement() #ReturnStatement: {} {
+    <RETURN> AssignmentExpression() <SEMI>
+}
+void Assignment() #Assignment: { Token t = null; } {
+    t = <IDENTIFIER> <ASSIGN> AssignmentExpression() <SEMI>
+}
+void IfStatement() #IfStatement: {} {
+    <IF> <LPAREN> BooleanExpression() <RPAREN>
+    <LBRACE> ( Statement() )* <RBRACE>
+    ( ElseStatement() )?
+}
+void ElseStatement() #ElseStatement: {} {
+    <ELSE> <LBRACE> ( Statement() )* <RBRACE>
+}
+void WhileStatement() #WhileStatement: {} {
+    <WHILE> <LPAREN> BooleanExpression() <RPAREN>
+    <LBRACE> ( Statement() )* <RBRACE>
+}
+void ForStatement() #ForStatement: {} {
+    <FOR> <LPAREN>
+    ( ForInit() )?
+    ( BooleanExpression() )? <SEMI>
+    ( UpdateExpression() )?
+    <RPAREN>
+    <LBRACE> ( Statement() )* <RBRACE>
+}
+void ForInit() #ForInit : {} {
+    ( VarDeclaration() | Assignment() )
+}
+void UpdateExpression() #UpdateExpression : { Token t = null; } {
+    ( t = <IDENTIFIER> #Identifier )
+    (
+        <ASSIGN> AssignmentExpression() #Assignment(2)
+      |
+        <PLUS_PLUS> #Increment(1)
+      |
+        <MINUS_MINUS> #Decrement(1)
+    )
+}
+void AssignmentExpression() #AssignmentExpression: {} {
+    BooleanExpression()
+}
+void BooleanExpression() #BooleanExpression(>1): {} {
+    ConditionalExpression() ( ( <AND> | <OR> ) ConditionalExpression() )*
+}
+void ConditionalExpression() #ConditionalExpression(>1): {} {
+    RelationalExpression() ( ( <EQ> | <NE> ) RelationalExpression() )*
+}
+void RelationalExpression() #RelationalExpression(>1): {} {
+    AdditiveExpression() ( ( <ST> | <GT> | <SE> | <GE> ) AdditiveExpression() )*
+}
+void AdditiveExpression() #AdditiveExpression(>1): {} {
+    Term()
+    (
+       ( <PLUS> Term() #Add(2) )
+     | ( <MINUS> Term() #Subtract(2) )
+    )*
+}
+void Term() #Term(>1): {} {
+    Factor()
+    (
+       ( <MUL> Factor() #Multiply(2) )
+     | ( <DIV> Factor() #Divide(2) )
+    )*
+}
+void Factor() #Factor: { Token t = null; } {
+    ( t = <NUMBER> #NumberLiteral
+    | t = <IDENTIFIER> #Identifier
+      {
+         if (!globalScope.lookup(t.image)) {
+             System.err.println("Semantic Error: Variable '" + t.image + "' is used but not declared!");
+         }
+      }
+    | t = <STRING_LITERAL> #StringLiteral
+    | <TRUE> #BooleanTrue
+    | <FALSE> #BooleanFalse
+    )
+    {
+       if (t != null) jjtThis.value = t.image;
+    }
+    | <LPAREN> AssignmentExpression() <RPAREN>
+}
+void ClassBody() #ClassBody: {} {
+    ( FunctionDeclaration() )*
+}
